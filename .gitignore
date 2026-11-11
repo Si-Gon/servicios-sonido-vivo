@@ -1,0 +1,29 @@
+# Build de Maven
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Wrapper de Maven (el jar se descarga solo)
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.apt_generated
+.factorypath
+.springBeans
+.sts4-cache
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs y temporales
+*.log
+HELP.md
