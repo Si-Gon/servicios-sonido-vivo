@@ -65,11 +65,18 @@ Requisitos: JDK 21 (`java -version` debe responder 21) y Maven.
 
 ## Compilar y arrancar
 
+El repositorio es un proyecto Maven multimódulo: el `pom.xml` de la raíz es el padre y define
+Java 21, Spring Boot 4.0.9, Spring Cloud 2025.1.4 y las dependencias de soporte. Cada servicio
+declara solo lo propio de su responsabilidad.
+
 ```
-cd mensajeria          # o catalogo, usuarios, pedidos
-mvn clean package -DskipTests
-mvn spring-boot:run    # o: java -jar target/mensajeria-0.0.1-SNAPSHOT.jar
+mvn clean package -DskipTests          # compila los siete módulos
+mvn -pl mensajeria -am package         # solo uno, con lo que necesite
+java -jar mensajeria/target/mensajeria-0.0.1-SNAPSHOT.jar
 ```
+
+Para agregar un servicio: crear la carpeta con su `pom.xml` (padre `com.sonidovivo:sonido-vivo-servicios`),
+declararlo en `<modules>` del pom padre y sumar solo sus dependencias particulares.
 
 Las tablas las crea Flyway al arrancar. No se crean a mano: el proyecto usa
 `spring.jpa.hibernate.ddl-auto=validate`, así que si el esquema no calza con la entidad, no
@@ -102,7 +109,7 @@ Cada servicio las lleva en `src/main/resources/db/migracion`, con el nombre
 
 ## Convenciones
 
-- Java 21, Spring Boot 4.0.9 (padre `spring-boot-starter-parent`), Maven.
+- Maven multimódulo: el padre es `sonido-vivo-servicios`, que hereda de `spring-boot-starter-parent` 4.0.9.
 - Spring Cloud **2025.1.4** para Eureka, Config y Gateway: es la línea compatible con Spring Boot 4.0
   (Spring Cloud 2023, la que usan los tutoriales, es para Boot 3).
 - Una base por servicio y sin claves foráneas entre bases distintas.
