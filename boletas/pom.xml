@@ -42,6 +42,12 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- Documentacion interactiva de la API -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+		</dependency>
+
 		<!-- Soporte: se anuncia en eureka y lee la configuración compartida -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
