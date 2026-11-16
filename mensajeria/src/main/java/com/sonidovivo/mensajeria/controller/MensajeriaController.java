@@ -14,7 +14,6 @@ import java.util.Map;
 // Endpoints del formulario de contacto. El front llama a estos desde la pagina Contacto.
 @RestController
 @RequestMapping("/api/contacto")
-@CrossOrigin(origins = "http://localhost:5173") // el front de Vite corre en ese puerto
 public class MensajeriaController {
 
     private final MensajeriaRepository repositorio;

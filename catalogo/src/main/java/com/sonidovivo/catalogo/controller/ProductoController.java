@@ -18,16 +18,16 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
 
 // Catalogo: consulta publica de productos y administracion desde el panel.
+// El CORS lo maneja el gateway: si el servicio tambien lo agrega, la respuesta
+// viaja con dos Access-Control-Allow-Origin y el navegador la rechaza.
 @RestController
 @RequestMapping("/api/productos")
-@CrossOrigin(origins = "http://localhost:5173")
 public class ProductoController {
 
     private static final int STOCK_CRITICO = 3;
