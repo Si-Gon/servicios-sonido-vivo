@@ -10,11 +10,11 @@ está en otro repositorio (`sonido-vivo-2`).
 
 | Servicio | Responsabilidad | Puerto | Base de datos | Estado |
 |---|---|---|---|---|
-| `mensajeria` | Mensajes del formulario de contacto y su bandeja en el panel | 8082 | `mensajeria` | funcionando |
-| `catalogo` | Productos, categorías y stock | 8081 | `catalogo` | esqueleto con migraciones aplicadas |
-| `usuarios` | Registro, roles y estado de las cuentas | 8083 | `usuarios` | esqueleto con migraciones aplicadas |
-| `boletas` | Boleta de venta: pedido y sus líneas | 8084 | `boletas` | esqueleto con migraciones aplicadas |
-| `despachos` | Entrega del pedido: domicilio o retiro, costo y datos de envío | 8085 | `despachos` | esqueleto con migraciones aplicadas |
+| `mensajeria` | Mensajes del formulario de contacto y su bandeja en el panel | 8095 | `mensajeria` | funcionando |
+| `catalogo` | Productos, categorías y stock | 8091 | `catalogo` | esqueleto con migraciones aplicadas |
+| `usuarios` | Registro, roles y estado de las cuentas | 8092 | `usuarios` | esqueleto con migraciones aplicadas |
+| `boletas` | Boleta de venta: pedido y sus líneas | 8093 | `boletas` | esqueleto con migraciones aplicadas |
+| `despachos` | Entrega del pedido: domicilio o retiro, costo y datos de envío | 8094 | `despachos` | esqueleto con migraciones aplicadas |
 
 La boleta y el despacho van separados: la boleta registra qué se vendió y por cuánto, y el
 despacho se encarga de la entrega. `despacho.pedido_id` identifica la boleta pero no lleva clave
@@ -28,7 +28,9 @@ foránea, porque cada servicio tiene su propia base.
 | `eureka` | Registro y descubrimiento: cada servicio se anuncia con su nombre | 8761 |
 | `gateway` | Puerta de entrada única; reparte `/api/**` al servicio que corresponde | 8090 |
 
-El gateway usa el 8090 porque el 8080 lo ocupa Docker en este equipo.
+Los servicios de negocio van del **8091 al 8095** y el gateway en el 8090, para tener los puertos
+en un mismo rango. El 8080 quedó descartado porque lo ocupa Docker en este equipo. `eureka` (8761)
+y `config` (8888) mantienen su puerto por defecto.
 
 Los tres esqueletos arrancan, Flyway crea sus tablas y el proyecto compila, pero todavía no
 tienen entidad, repositorio ni controlador: eso lo escribe quien tome cada servicio, siguiendo
