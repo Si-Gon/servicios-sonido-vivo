@@ -28,7 +28,8 @@
 		<module>eureka</module>
 		<module>catalogo</module>
 		<module>usuarios</module>
-		<module>pedidos</module>
+		<module>boletas</module>
+		<module>despachos</module>
 		<module>mensajeria</module>
 		<module>gateway</module>
 	</modules>

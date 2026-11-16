@@ -13,7 +13,12 @@ está en otro repositorio (`sonido-vivo-2`).
 | `mensajeria` | Mensajes del formulario de contacto y su bandeja en el panel | 8082 | `mensajeria` | funcionando |
 | `catalogo` | Productos, categorías y stock | 8081 | `catalogo` | esqueleto con migraciones aplicadas |
 | `usuarios` | Registro, roles y estado de las cuentas | 8083 | `usuarios` | esqueleto con migraciones aplicadas |
-| `pedidos` | Pedidos, líneas, despacho y boleta | 8084 | `pedidos` | esqueleto con migraciones aplicadas |
+| `boletas` | Boleta de venta: pedido y sus líneas | 8084 | `boletas` | esqueleto con migraciones aplicadas |
+| `despachos` | Entrega del pedido: domicilio o retiro, costo y datos de envío | 8085 | `despachos` | esqueleto con migraciones aplicadas |
+
+La boleta y el despacho van separados: la boleta registra qué se vendió y por cuánto, y el
+despacho se encarga de la entrega. `despacho.pedido_id` identifica la boleta pero no lleva clave
+foránea, porque cada servicio tiene su propia base.
 
 ### Servicios de soporte
 
@@ -34,7 +39,7 @@ el de `mensajeria` como modelo.
 Los servicios de soporte van primero, porque los demás dependen de ellos:
 
 ```
-config (8888)  →  eureka (8761)  →  catalogo / usuarios / pedidos / mensajeria  →  gateway (8090)
+config (8888)  →  eureka (8761)  →  catalogo / usuarios / boletas / despachos / mensajeria  →  gateway (8090)
 ```
 
 Cada servicio declara `spring.config.import=optional:configserver:http://localhost:8888`, así que si el
@@ -48,6 +53,8 @@ Rutas del gateway, con el servicio de mensajería como ejemplo:
 ```
 GET http://localhost:8090/api/contacto     ->  lb://mensajeria
 GET http://localhost:8090/api/productos/** ->  lb://catalogo
+GET http://localhost:8090/api/pedidos/**   ->  lb://boletas
+GET http://localhost:8090/api/despachos/** ->  lb://despachos
 ```
 
 ## Preparar el entorno
@@ -58,7 +65,8 @@ Crear las cuatro bases (una por servicio, sin sufijo `_db`):
 CREATE DATABASE mensajeria CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 CREATE DATABASE catalogo   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 CREATE DATABASE usuarios   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE DATABASE pedidos    CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE DATABASE boletas    CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE DATABASE despachos  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 ```
 
 Requisitos: JDK 21 (`java -version` debe responder 21) y Maven.
@@ -105,7 +113,8 @@ Cada servicio las lleva en `src/main/resources/db/migracion`, con el nombre
 | `mensajeria` | V1 contacto, V2 estado, V3 región y comuna | `contacto` |
 | `catalogo` | V1 categoría, V2 producto, V3 categorías base, V4 productos | `categoria`, `producto` |
 | `usuarios` | V1 rol, V2 usuario, V3 roles base | `rol`, `usuario` |
-| `pedidos` | V1 pedido, V2 pedido_item, V3 despacho | `pedido`, `pedido_item`, `despacho` |
+| `boletas` | V1 pedido, V2 pedido_item | `pedido`, `pedido_item` |
+| `despachos` | V1 despacho | `despacho` |
 
 ## Convenciones
 

@@ -1,0 +1,8 @@
+# Configuracion propia de boletas: Boletas y lineas de venta
+spring:
+  application:
+    name: boletas
+
+info:
+  servicio: boletas
+  descripcion: Boletas y lineas de venta

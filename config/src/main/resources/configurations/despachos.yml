@@ -1,0 +1,8 @@
+# Configuracion propia de despachos: Despachos y entregas
+spring:
+  application:
+    name: despachos
+
+info:
+  servicio: despachos
+  descripcion: Despachos y entregas
