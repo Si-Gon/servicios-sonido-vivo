@@ -6,6 +6,8 @@ está en otro repositorio (`sonido-vivo-2`).
 
 ## Servicios
 
+### Servicios de negocio
+
 | Servicio | Responsabilidad | Puerto | Base de datos | Estado |
 |---|---|---|---|---|
 | `mensajeria` | Mensajes del formulario de contacto y su bandeja en el panel | 8082 | `mensajeria` | funcionando |
@@ -13,9 +15,40 @@ está en otro repositorio (`sonido-vivo-2`).
 | `usuarios` | Registro, roles y estado de las cuentas | 8083 | `usuarios` | esqueleto con migraciones aplicadas |
 | `pedidos` | Pedidos, líneas, despacho y boleta | 8084 | `pedidos` | esqueleto con migraciones aplicadas |
 
+### Servicios de soporte
+
+| Servicio | Responsabilidad | Puerto |
+|---|---|---|
+| `config` | Entrega a cada servicio su configuración desde `configurations/*.yml` | 8888 |
+| `eureka` | Registro y descubrimiento: cada servicio se anuncia con su nombre | 8761 |
+| `gateway` | Puerta de entrada única; reparte `/api/**` al servicio que corresponde | 8090 |
+
+El gateway usa el 8090 porque el 8080 lo ocupa Docker en este equipo.
+
 Los tres esqueletos arrancan, Flyway crea sus tablas y el proyecto compila, pero todavía no
 tienen entidad, repositorio ni controlador: eso lo escribe quien tome cada servicio, siguiendo
 el de `mensajeria` como modelo.
+
+## Orden de arranque
+
+Los servicios de soporte van primero, porque los demás dependen de ellos:
+
+```
+config (8888)  →  eureka (8761)  →  catalogo / usuarios / pedidos / mensajeria  →  gateway (8090)
+```
+
+Cada servicio declara `spring.config.import=optional:configserver:http://localhost:8888`, así que si el
+servidor de configuración no está arriba igual arranca con lo que tiene en su propio
+`application.properties`. Lo mismo con Eureka: sin registro, el servicio funciona, solo que el gateway
+no lo encuentra.
+
+Registro en ejecución: `http://localhost:8761` muestra qué servicios están anunciados.
+Rutas del gateway, con el servicio de mensajería como ejemplo:
+
+```
+GET http://localhost:8090/api/contacto     ->  lb://mensajeria
+GET http://localhost:8090/api/productos/** ->  lb://catalogo
+```
 
 ## Preparar el entorno
 
@@ -70,6 +103,8 @@ Cada servicio las lleva en `src/main/resources/db/migracion`, con el nombre
 ## Convenciones
 
 - Java 21, Spring Boot 4.0.9 (padre `spring-boot-starter-parent`), Maven.
+- Spring Cloud **2025.1.4** para Eureka, Config y Gateway: es la línea compatible con Spring Boot 4.0
+  (Spring Cloud 2023, la que usan los tutoriales, es para Boot 3).
 - Una base por servicio y sin claves foráneas entre bases distintas.
 - `db/migracion` (no `db/migration`) y `V1__` con doble guion bajo.
 - Nombres de base sin sufijo `_db`.

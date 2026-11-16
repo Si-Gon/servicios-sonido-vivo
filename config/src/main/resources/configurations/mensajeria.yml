@@ -1,0 +1,8 @@
+# Configuracion propia de mensajeria: Mensajes del formulario de contacto
+spring:
+  application:
+    name: mensajeria
+
+info:
+  servicio: mensajeria
+  descripcion: Mensajes del formulario de contacto

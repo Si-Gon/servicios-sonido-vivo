@@ -1,0 +1,8 @@
+# Configuracion propia de catalogo: Productos, categorias y stock
+spring:
+  application:
+    name: catalogo
+
+info:
+  servicio: catalogo
+  descripcion: Productos, categorias y stock

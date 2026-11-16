@@ -1,0 +1,8 @@
+# Configuracion propia de usuarios: Registro, roles y estado de las cuentas
+spring:
+  application:
+    name: usuarios
+
+info:
+  servicio: usuarios
+  descripcion: Registro, roles y estado de las cuentas

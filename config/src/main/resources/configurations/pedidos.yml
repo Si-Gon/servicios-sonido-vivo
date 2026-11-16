@@ -1,0 +1,8 @@
+# Configuracion propia de pedidos: Pedidos, lineas, despacho y boleta
+spring:
+  application:
+    name: pedidos
+
+info:
+  servicio: pedidos
+  descripcion: Pedidos, lineas, despacho y boleta

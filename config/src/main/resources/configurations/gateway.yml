@@ -1,0 +1,4 @@
+# Configuracion propia del gateway
+info:
+  servicio: gateway
+  descripcion: Puerta de entrada del sitio
