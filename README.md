@@ -61,7 +61,12 @@ GET http://localhost:8090/api/despachos/** ->  lb://despachos
 
 ## Preparar el entorno
 
-Crear las cuatro bases (una por servicio, sin sufijo `_db`):
+Las bases **no hay que crearlas a mano**: cada servicio las crea al arrancar si no existen, porque su
+URL de conexión lleva `createDatabaseIfNotExist=true` y MySQL las crea con el charset por defecto
+(`utf8mb4` / `utf8mb4_0900_ai_ci`, que es justo el que se necesita). Flyway después crea las tablas
+con sus migraciones. Así, al clonar el repo en otro PC, basta con tener MySQL arriba.
+
+Si se prefiere crearlas antes (o el usuario de MySQL no tiene permiso para crear bases):
 
 ```sql
 CREATE DATABASE mensajeria CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
