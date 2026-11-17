@@ -6,6 +6,7 @@ import com.sonidovivo.catalogo.model.Categoria;
 import com.sonidovivo.catalogo.model.Producto;
 import com.sonidovivo.catalogo.repository.CategoriaRepository;
 import com.sonidovivo.catalogo.repository.ProductoRepository;
+import com.sonidovivo.catalogo.servicio.StockService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,10 +35,12 @@ public class ProductoController {
 
     private final ProductoRepository productos;
     private final CategoriaRepository categorias;
+    private final StockService stock;
 
-    public ProductoController(ProductoRepository productos, CategoriaRepository categorias) {
+    public ProductoController(ProductoRepository productos, CategoriaRepository categorias, StockService stock) {
         this.productos = productos;
         this.categorias = categorias;
+            this.stock = stock;
     }
 
     // Listado del catalogo. Admite los tres filtros que usa el front.
@@ -88,6 +91,10 @@ public class ProductoController {
         aplicar(producto, datos, categoria);
 
         Producto guardado = productos.save(producto);
+
+        // La carga inicial tambien deja rastro: entrada INICIAL en el kardex.
+        stock.registrarStockInicial(guardado.getId(), guardado.getStock());
+
         return ResponseEntity.status(HttpStatus.CREATED).body(ProductoResponse.desde(guardado));
     }
 
@@ -103,12 +110,24 @@ public class ProductoController {
                 return ResponseEntity.badRequest().body(Map.of("motivo", "La categoria no existe."));
             }
 
+            // El stock no se guarda con el resto: se deja el anterior para que el servicio calcule
+            // la diferencia y deje el ajuste en el kardex.
+            int stockAnterior = producto.getStock();
+            int stockPedido = datos.stock();
+
             aplicar(producto, datos, categoria);
-            return ResponseEntity.ok(ProductoResponse.desde(productos.save(producto)));
+            producto.setStock(stockAnterior);
+
+            Producto guardado = productos.save(producto);
+
+            int stockFinal = stock.fijarStock(id, stockPedido);
+            guardado.setStock(stockFinal);
+
+            return ResponseEntity.ok(ProductoResponse.desde(guardado));
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // El panel baja el stock al vender: es un cambio puntual, no una edicion completa.
+    // Deja el stock en un valor exacto. El cambio queda como ajuste en el kardex, no se pisa el historial.
     @PatchMapping("/{id}/stock")
     public ResponseEntity<?> actualizarStock(@PathVariable Long id, @RequestBody Map<String, Integer> cuerpo) {
         Integer nuevo = cuerpo.get("stock");
@@ -117,10 +136,20 @@ public class ProductoController {
             return ResponseEntity.badRequest().body(Map.of("motivo", "El stock debe ser un numero mayor o igual a cero."));
         }
 
-        return productos.findById(id).map(producto -> {
-            producto.setStock(nuevo);
-            return ResponseEntity.ok(ProductoResponse.desde(productos.save(producto)));
-        }).orElse(ResponseEntity.notFound().build());
+        try {
+            int stockFinal = stock.fijarStock(id, nuevo);
+
+            return productos.findById(id)
+                    .map(producto -> {
+                        producto.setStock(stockFinal);
+                        return ResponseEntity.ok(ProductoResponse.desde(producto));
+                    })
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (StockService.ProductoNoEncontrado e) {
+            return ResponseEntity.notFound().build();
+        } catch (StockService.MovimientoInvalido e) {
+            return ResponseEntity.badRequest().body(Map.of("motivo", e.getMessage()));
+        }
     }
 
     // Baja logica: el producto deja de mostrarse pero la boleta vieja lo sigue nombrando.

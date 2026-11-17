@@ -6,6 +6,7 @@ import com.sonidovivo.boletas.model.EstadoPedido;
 import com.sonidovivo.boletas.model.Pedido;
 import com.sonidovivo.boletas.model.PedidoItem;
 import com.sonidovivo.boletas.repository.PedidoRepository;
+import com.sonidovivo.boletas.servicio.CatalogoClient;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,9 +31,11 @@ import java.util.Map;
 public class PedidoController {
 
     private final PedidoRepository pedidos;
+    private final CatalogoClient catalogo;
 
-    public PedidoController(PedidoRepository pedidos) {
+    public PedidoController(PedidoRepository pedidos, CatalogoClient catalogo) {
         this.pedidos = pedidos;
+        this.catalogo = catalogo;
     }
 
     // Emite la boleta: el total y los subtotales los calcula el servicio, no el navegador.
@@ -106,6 +109,30 @@ public class PedidoController {
         }
 
         return pedidos.findById(id).map(pedido -> {
+            // Cancelar devuelve el stock al catalogo como una entrada nueva; no se reescribe la venta.
+            if (EstadoPedido.CANCELADO.name().equals(nuevo)) {
+                if (EstadoPedido.CANCELADO.name().equals(pedido.getEstado())) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                            .body(Map.of("motivo", "El pedido ya estaba cancelado."));
+                }
+
+                if (EstadoPedido.DESPACHADO.name().equals(pedido.getEstado())
+                        || EstadoPedido.ENTREGADO.name().equals(pedido.getEstado())) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                            .body(Map.of("motivo", "El pedido ya salio: no se puede cancelar."));
+                }
+
+                try {
+                    for (PedidoItem item : pedido.getItems()) {
+                        catalogo.devolverStock(item.getProductoId(), item.getCantidad(), pedido.getId());
+                    }
+                } catch (CatalogoClient.CatalogoNoDisponible e) {
+                    // Sin la devolucion no se cancela: es preferible repetir la operacion a dejarla a medias.
+                    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                            .body(Map.of("motivo", e.getMessage()));
+                }
+            }
+
             pedido.setEstado(nuevo);
             return ResponseEntity.ok(PedidoResponse.desde(pedidos.save(pedido)));
         }).orElse(ResponseEntity.notFound().build());

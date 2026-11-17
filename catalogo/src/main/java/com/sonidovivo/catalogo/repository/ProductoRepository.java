@@ -2,7 +2,9 @@ package com.sonidovivo.catalogo.repository;
 
 import com.sonidovivo.catalogo.model.Producto;
 import org.springframework.data.jpa.repository.EntityGraph;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -51,4 +53,9 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
            ORDER BY p.nombre
            """)
     List<Producto> buscarPorTextoEnCategoria(@Param("categoriaId") Long categoriaId, @Param("texto") String texto);
+
+    // Bloquea la fila mientras se calcula el nuevo stock: dos ventas a la vez no pueden leer el mismo valor.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Producto p where p.id = :id")
+    Optional<Producto> findByIdForUpdate(@Param("id") Long id);
 }
