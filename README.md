@@ -94,7 +94,7 @@ responde `400` con el motivo.
 
 | Método | Ruta | Uso |
 |---|---|---|
-| `POST` | `/api/pedidos` | Emitir la boleta; el total y los subtotales los calcula el servicio |
+| `POST` | `/api/pedidos` | Emitir la boleta; el total lo calcula el servicio y acepta `claveIdempotencia` |
 | `GET` | `/api/pedidos` | Listar; filtros `?usuarioId=`, `?estado=` |
 | `GET` | `/api/pedidos/{id}` | Ver la boleta con sus líneas |
 | `PATCH` | `/api/pedidos/{id}/estado` | Cambiar estado; cancelar devuelve el stock al catálogo |
@@ -147,6 +147,21 @@ el stock resultante.
   cancelación no devuelve el stock dos veces.
 - Una `CANCELACION` solo se acepta si existe la `VENTA` de esa referencia; si no, se omite en vez de
   inventar unidades.
+
+## Idempotencia
+
+Un reintento de red no debe cobrar ni descontar dos veces. Se resuelve en dos puntos:
+
+- **Stock**: cada movimiento del kardex lleva `referencia` (`PEDIDO-<id>`) y la tabla tiene
+  `UNIQUE (producto_id, motivo, referencia)`, así que repetir la venta o la cancelación no cambia
+  nada.
+- **Emisión de la boleta**: el checkout genera una `claveIdempotencia` por intento de pago
+  (`crypto.randomUUID()` en el navegador) y la manda en el `POST`. `pedido.clave_idempotencia` es
+  `UNIQUE`; si la clave se repite, el servicio devuelve **la boleta que ya existe** con `200` en vez
+  de crear otra. Dos peticiones simultáneas con la misma clave también terminan en una sola boleta:
+  la segunda choca con el `UNIQUE` y responde con la de la primera.
+- Sin clave, el endpoint se comporta como antes (`201` y boleta nueva), para no romper otros
+  clientes.
 
 ## Preparar el entorno
 
@@ -210,7 +225,7 @@ Cada servicio las lleva en `src/main/resources/db/migracion`, con el nombre
 |---|---|---|
 | `catalogo` | V1 categoría, V2 producto, V3 categorías base, V4 productos base, V5 tipo de descuento, V6 movimiento de stock | `categoria`, `producto`, `movimiento_stock` |
 | `usuarios` | V1 rol, V2 usuario, V3 roles base, V4 collation | `rol`, `usuario` |
-| `boletas` | V1 pedido, V2 pedido_item | `pedido`, `pedido_item` |
+| `boletas` | V1 pedido, V2 pedido_item, V3 clave de idempotencia | `pedido`, `pedido_item` |
 | `despachos` | V1 despacho | `despacho` |
 | `mensajeria` | V1 contacto, V2 estado, V3 región y comuna | `contacto` |
 

@@ -25,6 +25,10 @@ public record PedidoRequest(
         String emailCliente,
 
         @NotEmpty(message = "La boleta necesita al menos un producto")
-        List<@Valid ItemRequest> items
+        List<@Valid ItemRequest> items,
+
+        // Opcional: la manda el checkout para que un reintento no emita dos boletas.
+        @Size(max = 64, message = "La clave de idempotencia no puede superar los 64 caracteres")
+        String claveIdempotencia
 ) {
 }

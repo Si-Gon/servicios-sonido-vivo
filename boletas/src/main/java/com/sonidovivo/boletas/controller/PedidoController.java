@@ -8,6 +8,7 @@ import com.sonidovivo.boletas.model.PedidoItem;
 import com.sonidovivo.boletas.repository.PedidoRepository;
 import com.sonidovivo.boletas.servicio.CatalogoClient;
 import jakarta.validation.Valid;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,7 +42,21 @@ public class PedidoController {
     // Emite la boleta: el total y los subtotales los calcula el servicio, no el navegador.
     @PostMapping
     public ResponseEntity<?> emitir(@Valid @RequestBody PedidoRequest datos) {
+        String clave = (datos.claveIdempotencia() == null || datos.claveIdempotencia().isBlank())
+                ? null
+                : datos.claveIdempotencia().trim();
+
+        // Si el navegador reintenta el mismo intento de pago, se devuelve la boleta que ya existe.
+        if (clave != null) {
+            Pedido yaEmitida = pedidos.findByClaveIdempotencia(clave).orElse(null);
+
+            if (yaEmitida != null) {
+                return ResponseEntity.ok(PedidoResponse.desde(yaEmitida));
+            }
+        }
+
         Pedido pedido = new Pedido();
+        pedido.setClaveIdempotencia(clave);
         pedido.setUsuarioId(datos.usuarioId());
         pedido.setNombreCliente(datos.nombreCliente().trim());
         pedido.setEmailCliente(datos.emailCliente().trim().toLowerCase());
@@ -65,8 +80,20 @@ public class PedidoController {
 
         pedido.setTotal(total);
 
-        Pedido guardado = pedidos.save(pedido);
-        return ResponseEntity.status(HttpStatus.CREATED).body(PedidoResponse.desde(guardado));
+        try {
+            Pedido guardado = pedidos.save(pedido);
+            return ResponseEntity.status(HttpStatus.CREATED).body(PedidoResponse.desde(guardado));
+        } catch (DataIntegrityViolationException e) {
+            // Dos peticiones a la vez con la misma clave: gana la primera, esta devuelve esa boleta.
+            if (clave == null) {
+                throw e;
+            }
+
+            return pedidos.findByClaveIdempotencia(clave)
+                    .map(PedidoResponse::desde)
+                    .map(ResponseEntity::ok)
+                    .orElseThrow(() -> e);
+        }
     }
 
     // Listado para el panel; admite filtrar por usuario o por estado.

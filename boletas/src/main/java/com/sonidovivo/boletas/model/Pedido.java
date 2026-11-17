@@ -43,6 +43,10 @@ public class Pedido {
     @Column(nullable = false, length = 20)
     private String estado = EstadoPedido.PENDIENTE.name();
 
+    // Clave del intento de pago: evita que un reintento cree una segunda boleta.
+    @Column(name = "clave_idempotencia", length = 64, unique = true)
+    private String claveIdempotencia;
+
     @Column(name = "fecha_creacion", insertable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 

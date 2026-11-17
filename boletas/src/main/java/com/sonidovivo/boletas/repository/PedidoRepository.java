@@ -20,4 +20,7 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
     @EntityGraph(attributePaths = "items")
     Optional<Pedido> findByIdAndUsuarioId(Long id, Long usuarioId);
+
+    @EntityGraph(attributePaths = "items")
+    Optional<Pedido> findByClaveIdempotencia(String claveIdempotencia);
 }
