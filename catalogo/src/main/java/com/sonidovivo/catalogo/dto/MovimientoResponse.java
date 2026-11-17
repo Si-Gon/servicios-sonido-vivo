@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 public record MovimientoResponse(
         Long id,
         Long productoId,
+        String codigo,
+        String producto,
         String tipo,
         Integer cantidad,
         String motivo,
@@ -16,9 +18,14 @@ public record MovimientoResponse(
 ) {
 
     public static MovimientoResponse desde(MovimientoStock movimiento) {
+        String codigo = movimiento.getProducto() == null ? null : movimiento.getProducto().getCodigo();
+        String nombre = movimiento.getProducto() == null ? null : movimiento.getProducto().getNombre();
+
         return new MovimientoResponse(
                 movimiento.getId(),
                 movimiento.getProductoId(),
+                codigo,
+                nombre,
                 movimiento.getTipo(),
                 movimiento.getCantidad(),
                 movimiento.getMotivo(),
