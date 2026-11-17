@@ -1,0 +1,10 @@
+${AnsiColor.BRIGHT_YELLOW}==============================================================================
+ ___  ___ ___ ___  _   ___ _  _  ___  ___ 
+|   \| __/ __| _ \/_\ / __| || |/ _ \/ __|
+| |) | _|\__ \  _/ _ \ (__| __ | (_) \__ \
+|___/|___|___/_|/_/ \_\___|_||_|\___/|___/
+                                          
+${AnsiColor.BRIGHT_WHITE} Sonido Vivo - Despachos
+${AnsiColor.DEFAULT} Entrega del pedido: domicilio o retiro
+ Puerto 8094 - Spring Boot ${spring-boot.version}
+${AnsiColor.BRIGHT_YELLOW}==============================================================================${AnsiColor.DEFAULT}

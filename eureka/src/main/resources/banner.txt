@@ -1,0 +1,10 @@
+${AnsiColor.BRIGHT_YELLOW}==============================================================================
+ ___ _   _ ___ ___ _  __   _   
+| __| | | | _ \ __| |/ /  /_\  
+| _|| |_| |   / _|| ' <  / _ \ 
+|___|\___/|_|_\___|_|\_\/_/ \_\
+                               
+${AnsiColor.BRIGHT_WHITE} Sonido Vivo - Eureka
+${AnsiColor.DEFAULT} Registro y descubrimiento de servicios
+ Puerto 8761 - Spring Boot ${spring-boot.version}
+${AnsiColor.BRIGHT_YELLOW}==============================================================================${AnsiColor.DEFAULT}
