@@ -42,6 +42,20 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- Tokens JWT -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+		</dependency>
+
 		<!-- Documentacion interactiva de la API -->
 		<dependency>
 			<groupId>org.springdoc</groupId>

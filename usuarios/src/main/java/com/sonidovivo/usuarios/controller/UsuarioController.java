@@ -2,7 +2,9 @@ package com.sonidovivo.usuarios.controller;
 
 import com.sonidovivo.usuarios.dto.LoginRequest;
 import com.sonidovivo.usuarios.dto.UsuarioRequest;
+import com.sonidovivo.usuarios.dto.LoginResponse;
 import com.sonidovivo.usuarios.dto.UsuarioResponse;
+import com.sonidovivo.usuarios.seguridad.TokenService;
 import com.sonidovivo.usuarios.servicio.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,9 +26,11 @@ import java.util.Map;
 public class UsuarioController {
 
     private final UsuarioService usuarios;
+    private final TokenService tokens;
 
-    public UsuarioController(UsuarioService usuarios) {
+    public UsuarioController(UsuarioService usuarios, TokenService tokens) {
         this.usuarios = usuarios;
+        this.tokens = tokens;
     }
 
     @GetMapping
@@ -47,8 +51,9 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public UsuarioResponse login(@Valid @RequestBody LoginRequest datos) {
-        return UsuarioResponse.desde(usuarios.autenticar(datos.email(), datos.password()));
+    public LoginResponse login(@Valid @RequestBody LoginRequest datos) {
+        var usuario = usuarios.autenticar(datos.email(), datos.password());
+        return LoginResponse.desde(tokens.emitir(usuario), usuario);
     }
 
     @PatchMapping("/{id}/rol")
