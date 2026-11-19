@@ -1,6 +1,7 @@
 package com.sonidovivo.catalogo.controller;
 
 import com.sonidovivo.catalogo.dto.CategoriaRequest;
+import com.sonidovivo.catalogo.excepcion.ErrorDeNegocio;
 import com.sonidovivo.catalogo.model.Categoria;
 import com.sonidovivo.catalogo.repository.CategoriaRepository;
 import com.sonidovivo.catalogo.repository.ProductoRepository;
@@ -46,18 +47,17 @@ public class CategoriaController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Categoria> buscar(@PathVariable Long id) {
+    public Categoria buscar(@PathVariable Long id) {
         return categorias.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("La categoría " + id + " no existe."));
     }
 
     @PostMapping
-    public ResponseEntity<?> crear(@Valid @RequestBody CategoriaRequest datos) {
+    public ResponseEntity<Categoria> crear(@Valid @RequestBody CategoriaRequest datos) {
         String nombre = datos.nombre().trim();
 
         if (categorias.existsByNombreIgnoreCase(nombre)) {
-            return ResponseEntity.badRequest().body(Map.of("motivo", "Esa categoria ya existe."));
+            throw ErrorDeNegocio.invalido("La categoría " + nombre + " ya existe.");
         }
 
         Categoria categoria = new Categoria();
@@ -66,33 +66,34 @@ public class CategoriaController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> renombrar(@PathVariable Long id, @Valid @RequestBody CategoriaRequest datos) {
+    public Categoria renombrar(@PathVariable Long id, @Valid @RequestBody CategoriaRequest datos) {
         String nombre = datos.nombre().trim();
 
-        return categorias.findById(id).map(categoria -> {
-            if (categorias.existsByNombreIgnoreCase(nombre)
-                    && !categoria.getNombre().equalsIgnoreCase(nombre)) {
-                return ResponseEntity.badRequest().body(Map.of("motivo", "Esa categoria ya existe."));
-            }
+        Categoria categoria = categorias.findById(id)
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("La categoría " + id + " no existe."));
 
-            categoria.setNombre(nombre);
-            return ResponseEntity.ok(categorias.save(categoria));
-        }).orElse(ResponseEntity.notFound().build());
+        if (categorias.existsByNombreIgnoreCase(nombre) && !categoria.getNombre().equalsIgnoreCase(nombre)) {
+            throw ErrorDeNegocio.invalido("La categoría " + nombre + " ya existe.");
+        }
+
+        categoria.setNombre(nombre);
+        return categorias.save(categoria);
     }
 
     // No se borra una categoria con productos: dejaria productos sin clasificar.
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> eliminar(@PathVariable Long id) {
-        return categorias.findById(id).map(categoria -> {
-            long cuantos = productos.countByCategoriaId(id);
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        Categoria categoria = categorias.findById(id)
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("La categoría " + id + " no existe."));
 
-            if (cuantos > 0) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("motivo", "La categoria tiene " + cuantos + " productos: no se puede borrar."));
-            }
+        long cuantos = productos.countByCategoriaId(id);
 
-            categorias.delete(categoria);
-            return ResponseEntity.noContent().build();
-        }).orElse(ResponseEntity.notFound().build());
+        if (cuantos > 0) {
+            throw ErrorDeNegocio.conflicto("La categoría " + categoria.getNombre() + " tiene " + cuantos
+                    + " productos: no se puede borrar.");
+        }
+
+        categorias.delete(categoria);
+        return ResponseEntity.noContent().build();
     }
 }

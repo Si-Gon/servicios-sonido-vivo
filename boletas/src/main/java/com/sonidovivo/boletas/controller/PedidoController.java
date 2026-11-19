@@ -1,6 +1,7 @@
 package com.sonidovivo.boletas.controller;
 
 import com.sonidovivo.boletas.dto.PedidoRequest;
+import com.sonidovivo.boletas.excepcion.ErrorDeNegocio;
 import com.sonidovivo.boletas.dto.PedidoResponse;
 import com.sonidovivo.boletas.model.EstadoPedido;
 import com.sonidovivo.boletas.model.Pedido;
@@ -116,52 +117,48 @@ public class PedidoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PedidoResponse> buscar(@PathVariable Long id) {
+    public PedidoResponse buscar(@PathVariable Long id) {
         return pedidos.findById(id)
                 .map(PedidoResponse::desde)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("La boleta " + id + " no existe."));
     }
 
     // Cambia el estado (en preparacion, despachado, entregado, cancelado).
     @PatchMapping("/{id}/estado")
-    public ResponseEntity<?> cambiarEstado(@PathVariable Long id, @RequestBody Map<String, String> cuerpo) {
-        String nuevo = cuerpo.getOrDefault("estado", "").toUpperCase();
+    public PedidoResponse cambiarEstado(@PathVariable Long id, @RequestBody Map<String, String> cuerpo) {
+        String nuevo = cuerpo.getOrDefault("estado", "").trim().toUpperCase();
 
         boolean valido = Arrays.stream(EstadoPedido.values()).anyMatch(estado -> estado.name().equals(nuevo));
 
         if (!valido) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("motivo", "Estado invalido. Se acepta: " + Arrays.toString(EstadoPedido.values())));
+            throw ErrorDeNegocio.invalido("Estado inválido. Se acepta: " + Arrays.toString(EstadoPedido.values()));
         }
 
-        return pedidos.findById(id).map(pedido -> {
-            // Cancelar devuelve el stock al catalogo como una entrada nueva; no se reescribe la venta.
-            if (EstadoPedido.CANCELADO.name().equals(nuevo)) {
-                if (EstadoPedido.CANCELADO.name().equals(pedido.getEstado())) {
-                    return ResponseEntity.status(HttpStatus.CONFLICT)
-                            .body(Map.of("motivo", "El pedido ya estaba cancelado."));
-                }
+        Pedido pedido = pedidos.findById(id)
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("La boleta " + id + " no existe."));
 
-                if (EstadoPedido.DESPACHADO.name().equals(pedido.getEstado())
-                        || EstadoPedido.ENTREGADO.name().equals(pedido.getEstado())) {
-                    return ResponseEntity.status(HttpStatus.CONFLICT)
-                            .body(Map.of("motivo", "El pedido ya salio: no se puede cancelar."));
-                }
-
-                try {
-                    for (PedidoItem item : pedido.getItems()) {
-                        catalogo.devolverStock(item.getProductoId(), item.getCantidad(), pedido.getId());
-                    }
-                } catch (CatalogoClient.CatalogoNoDisponible e) {
-                    // Sin la devolucion no se cancela: es preferible repetir la operacion a dejarla a medias.
-                    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                            .body(Map.of("motivo", e.getMessage()));
-                }
+        // Cancelar devuelve el stock al catalogo como una entrada nueva; no se reescribe la venta.
+        if (EstadoPedido.CANCELADO.name().equals(nuevo)) {
+            if (EstadoPedido.CANCELADO.name().equals(pedido.getEstado())) {
+                throw ErrorDeNegocio.conflicto("La boleta " + id + " ya estaba cancelada.");
             }
 
-            pedido.setEstado(nuevo);
-            return ResponseEntity.ok(PedidoResponse.desde(pedidos.save(pedido)));
-        }).orElse(ResponseEntity.notFound().build());
+            if (EstadoPedido.DESPACHADO.name().equals(pedido.getEstado())
+                    || EstadoPedido.ENTREGADO.name().equals(pedido.getEstado())) {
+                throw ErrorDeNegocio.conflicto("El pedido " + id + " ya salió: no se puede cancelar.");
+            }
+
+            try {
+                for (PedidoItem item : pedido.getItems()) {
+                    catalogo.devolverStock(item.getProductoId(), item.getCantidad(), pedido.getId());
+                }
+            } catch (CatalogoClient.CatalogoNoDisponible e) {
+                // Sin la devolucion no se cancela: es preferible repetir la operacion a dejarla a medias.
+                throw ErrorDeNegocio.noDisponible(e.getMessage());
+            }
+        }
+
+        pedido.setEstado(nuevo);
+        return PedidoResponse.desde(pedidos.save(pedido));
     }
 }

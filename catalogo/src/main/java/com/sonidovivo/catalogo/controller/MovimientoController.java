@@ -44,11 +44,8 @@ public class MovimientoController {
                             "movimiento", MovimientoResponse.desde(resultado.movimiento()),
                             "repetido", resultado.repetido()));
         } catch (StockService.SinVentaQueDevolver e) {
+            // No es un error: no habia venta que devolver, asi que la devolucion se omite.
             return ResponseEntity.ok(Map.of("omitido", true, "motivo", e.getMessage()));
-        } catch (StockService.MovimientoInvalido e) {
-            return ResponseEntity.unprocessableEntity().body(Map.of("motivo", e.getMessage()));
-        } catch (StockService.ProductoNoEncontrado e) {
-            return ResponseEntity.notFound().build();
         }
     }
 

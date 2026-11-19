@@ -4,6 +4,7 @@ import com.sonidovivo.usuarios.dto.LoginRequest;
 import com.sonidovivo.usuarios.dto.UsuarioRequest;
 import com.sonidovivo.usuarios.dto.LoginResponse;
 import com.sonidovivo.usuarios.dto.UsuarioResponse;
+import com.sonidovivo.usuarios.excepcion.ErrorDeNegocio;
 import com.sonidovivo.usuarios.seguridad.TokenService;
 import com.sonidovivo.usuarios.servicio.UsuarioService;
 import jakarta.validation.Valid;
@@ -66,7 +67,7 @@ public class UsuarioController {
         Boolean activo = cuerpo.get("activo");
 
         if (activo == null) {
-            throw new UsuarioService.ErrorDeNegocio(HttpStatus.BAD_REQUEST, "Falta indicar si la cuenta queda activa.");
+            throw ErrorDeNegocio.invalido("Falta indicar si la cuenta queda activa.");
         }
 
         return UsuarioResponse.desde(usuarios.cambiarEstado(id, activo));

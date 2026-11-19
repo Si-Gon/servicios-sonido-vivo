@@ -1,6 +1,7 @@
 package com.sonidovivo.catalogo.servicio;
 
 import com.sonidovivo.catalogo.dto.MovimientoRequest;
+import com.sonidovivo.catalogo.excepcion.ErrorDeNegocio;
 import com.sonidovivo.catalogo.model.MovimientoStock;
 import com.sonidovivo.catalogo.model.Producto;
 import com.sonidovivo.catalogo.model.TipoMovimiento;
@@ -39,7 +40,7 @@ public class StockService {
         String tipo = datos.tipo().trim().toUpperCase();
 
         if (!TipoMovimiento.ENTRADA.name().equals(tipo) && !TipoMovimiento.SALIDA.name().equals(tipo)) {
-            throw new MovimientoInvalido("El tipo debe ser ENTRADA o SALIDA.");
+            throw ErrorDeNegocio.sinStock("El tipo debe ser ENTRADA o SALIDA.");
         }
 
         String motivo = datos.motivo().trim().toUpperCase();
@@ -64,7 +65,7 @@ public class StockService {
         }
 
         Producto producto = productos.findByIdForUpdate(productoId)
-                .orElseThrow(() -> new ProductoNoEncontrado("El producto " + productoId + " no existe."));
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El producto " + productoId + " no existe."));
 
         int cantidad = datos.cantidad();
         int stockAnterior = producto.getStock();
@@ -74,7 +75,7 @@ public class StockService {
             nuevoStock = stockAnterior + cantidad;
         } else {
             if (stockAnterior < cantidad) {
-                throw new MovimientoInvalido("Stock insuficiente para \"" + producto.getNombre()
+                throw ErrorDeNegocio.sinStock("Stock insuficiente para \"" + producto.getNombre()
                         + "\": quedan " + stockAnterior + " y se piden " + cantidad + ".");
             }
 
@@ -95,11 +96,11 @@ public class StockService {
     @Transactional
     public int fijarStock(Long productoId, int nuevoStock) {
         if (nuevoStock < 0) {
-            throw new MovimientoInvalido("El stock debe ser un numero mayor o igual a cero.");
+            throw ErrorDeNegocio.sinStock("El stock debe ser un numero mayor o igual a cero.");
         }
 
         Producto producto = productos.findByIdForUpdate(productoId)
-                .orElseThrow(() -> new ProductoNoEncontrado("El producto " + productoId + " no existe."));
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El producto " + productoId + " no existe."));
 
         int diferencia = nuevoStock - producto.getStock();
 
@@ -124,7 +125,7 @@ public class StockService {
         }
 
         Producto producto = productos.findByIdForUpdate(productoId)
-                .orElseThrow(() -> new ProductoNoEncontrado("El producto " + productoId + " no existe."));
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El producto " + productoId + " no existe."));
 
         darDeAlta(producto, cantidad, MovimientoStock.INICIAL, null, cantidad);
     }
@@ -156,12 +157,6 @@ public class StockService {
         return movimientos.save(movimiento);
     }
 
-    public static class MovimientoInvalido extends RuntimeException {
-        public MovimientoInvalido(String mensaje) {
-            super(mensaje);
-        }
-    }
-
     // La venta no existe para esa referencia: la devolucion se omite, no es un error.
     public static class SinVentaQueDevolver extends RuntimeException {
         private final Long productoId;
@@ -180,12 +175,6 @@ public class StockService {
 
         public String getReferencia() {
             return referencia;
-        }
-    }
-
-    public static class ProductoNoEncontrado extends RuntimeException {
-        public ProductoNoEncontrado(String mensaje) {
-            super(mensaje);
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.sonidovivo.mensajeria.controller;
 
 import com.sonidovivo.mensajeria.dto.ContactoRequest;
+import com.sonidovivo.mensajeria.excepcion.ErrorDeNegocio;
 import com.sonidovivo.mensajeria.model.Mensajeria;
 import com.sonidovivo.mensajeria.repository.MensajeriaRepository;
 import jakarta.validation.Valid;
@@ -15,6 +16,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/contacto")
 public class MensajeriaController {
+
+    // Estados que admite la bandeja.
+    private static final List<String> ESTADOS = List.of("PENDIENTE", "RESPONDIDO");
 
     private final MensajeriaRepository repositorio;
 
@@ -48,28 +52,32 @@ public class MensajeriaController {
 
     // Un mensaje puntual, para la vista de detalle.
     @GetMapping("/{id}")
-    public ResponseEntity<Mensajeria> buscar(@PathVariable Long id) {
+    public Mensajeria buscar(@PathVariable Long id) {
         return repositorio.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El mensaje " + id + " no existe."));
     }
 
-    // Marcar como respondido desde la bandeja.
+    // Marcar como respondido (o devolverlo a pendiente) desde la bandeja.
     @PatchMapping("/{id}/estado")
-    public ResponseEntity<Mensajeria> cambiarEstado(@PathVariable Long id, @RequestBody Map<String, String> cuerpo) {
-        String estado = cuerpo.getOrDefault("estado", "RESPONDIDO").toUpperCase();
+    public Mensajeria cambiarEstado(@PathVariable Long id, @RequestBody Map<String, String> cuerpo) {
+        String estado = cuerpo.getOrDefault("estado", "RESPONDIDO").trim().toUpperCase();
 
-        return repositorio.findById(id).map(mensaje -> {
-            mensaje.setEstado(estado);
-            return ResponseEntity.ok(repositorio.save(mensaje));
-        }).orElse(ResponseEntity.notFound().build());
+        if (!ESTADOS.contains(estado)) {
+            throw ErrorDeNegocio.invalido("El estado debe ser PENDIENTE o RESPONDIDO.");
+        }
+
+        Mensajeria mensaje = repositorio.findById(id)
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El mensaje " + id + " no existe."));
+
+        mensaje.setEstado(estado);
+        return repositorio.save(mensaje);
     }
 
     // Borrar un mensaje (solo el administrador).
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         if (!repositorio.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw ErrorDeNegocio.noEncontrado("El mensaje " + id + " no existe.");
         }
         repositorio.deleteById(id);
         return ResponseEntity.noContent().build();

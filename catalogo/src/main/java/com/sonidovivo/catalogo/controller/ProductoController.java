@@ -2,6 +2,7 @@ package com.sonidovivo.catalogo.controller;
 
 import com.sonidovivo.catalogo.dto.ProductoRequest;
 import com.sonidovivo.catalogo.dto.ProductoResponse;
+import com.sonidovivo.catalogo.excepcion.ErrorDeNegocio;
 import com.sonidovivo.catalogo.model.Categoria;
 import com.sonidovivo.catalogo.model.Producto;
 import com.sonidovivo.catalogo.repository.CategoriaRepository;
@@ -31,8 +32,6 @@ import java.util.Map;
 @RequestMapping("/api/productos")
 public class ProductoController {
 
-    private static final int STOCK_CRITICO = 3;
-
     private final ProductoRepository productos;
     private final CategoriaRepository categorias;
     private final StockService stock;
@@ -40,7 +39,7 @@ public class ProductoController {
     public ProductoController(ProductoRepository productos, CategoriaRepository categorias, StockService stock) {
         this.productos = productos;
         this.categorias = categorias;
-            this.stock = stock;
+        this.stock = stock;
     }
 
     // Listado del catalogo. Admite los tres filtros que usa el front.
@@ -69,26 +68,20 @@ public class ProductoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProductoResponse> buscar(@PathVariable Long id) {
+    public ProductoResponse buscar(@PathVariable Long id) {
         return productos.findByIdAndActivoTrue(id)
                 .map(ProductoResponse::desde)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El producto " + id + " no existe."));
     }
 
     @PostMapping
-    public ResponseEntity<?> crear(@Valid @RequestBody ProductoRequest datos) {
+    public ResponseEntity<ProductoResponse> crear(@Valid @RequestBody ProductoRequest datos) {
         if (productos.existsByCodigo(datos.codigo().trim().toUpperCase())) {
-            return ResponseEntity.badRequest().body(Map.of("motivo", "Ya existe un producto con ese codigo."));
-        }
-
-        Categoria categoria = categorias.findById(datos.categoriaId()).orElse(null);
-        if (categoria == null) {
-            return ResponseEntity.badRequest().body(Map.of("motivo", "La categoria no existe."));
+            throw ErrorDeNegocio.invalido("Ya existe un producto con el código " + datos.codigo().trim().toUpperCase() + ".");
         }
 
         Producto producto = new Producto();
-        aplicar(producto, datos, categoria);
+        aplicar(producto, datos, categoriaDe(datos.categoriaId()));
 
         Producto guardado = productos.save(producto);
 
@@ -99,67 +92,63 @@ public class ProductoController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> actualizar(@PathVariable Long id, @Valid @RequestBody ProductoRequest datos) {
-        return productos.findById(id).map(producto -> {
-            if (productos.existsByCodigoAndIdNot(datos.codigo().trim().toUpperCase(), id)) {
-                return ResponseEntity.badRequest().body(Map.of("motivo", "Ya existe otro producto con ese codigo."));
-            }
+    public ProductoResponse actualizar(@PathVariable Long id, @Valid @RequestBody ProductoRequest datos) {
+        Producto producto = productos.findById(id)
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El producto " + id + " no existe."));
 
-            Categoria categoria = categorias.findById(datos.categoriaId()).orElse(null);
-            if (categoria == null) {
-                return ResponseEntity.badRequest().body(Map.of("motivo", "La categoria no existe."));
-            }
+        if (productos.existsByCodigoAndIdNot(datos.codigo().trim().toUpperCase(), id)) {
+            throw ErrorDeNegocio.invalido("Ya existe otro producto con el código " + datos.codigo().trim().toUpperCase() + ".");
+        }
 
-            // El stock no se guarda con el resto: se deja el anterior para que el servicio calcule
-            // la diferencia y deje el ajuste en el kardex.
-            int stockAnterior = producto.getStock();
-            int stockPedido = datos.stock();
+        Categoria categoria = categoriaDe(datos.categoriaId());
 
-            aplicar(producto, datos, categoria);
-            producto.setStock(stockAnterior);
+        // El stock no se guarda con el resto: se deja el anterior para que el servicio calcule
+        // la diferencia y deje el ajuste en el kardex.
+        int stockAnterior = producto.getStock();
+        int stockPedido = datos.stock();
 
-            Producto guardado = productos.save(producto);
+        aplicar(producto, datos, categoria);
+        producto.setStock(stockAnterior);
 
-            int stockFinal = stock.fijarStock(id, stockPedido);
-            guardado.setStock(stockFinal);
+        Producto guardado = productos.save(producto);
+        guardado.setStock(stock.fijarStock(id, stockPedido));
 
-            return ResponseEntity.ok(ProductoResponse.desde(guardado));
-        }).orElse(ResponseEntity.notFound().build());
+        return ProductoResponse.desde(guardado);
     }
 
     // Deja el stock en un valor exacto. El cambio queda como ajuste en el kardex, no se pisa el historial.
     @PatchMapping("/{id}/stock")
-    public ResponseEntity<?> actualizarStock(@PathVariable Long id, @RequestBody Map<String, Integer> cuerpo) {
+    public ProductoResponse actualizarStock(@PathVariable Long id, @RequestBody Map<String, Integer> cuerpo) {
         Integer nuevo = cuerpo.get("stock");
 
         if (nuevo == null || nuevo < 0) {
-            return ResponseEntity.badRequest().body(Map.of("motivo", "El stock debe ser un numero mayor o igual a cero."));
+            throw ErrorDeNegocio.invalido("El stock debe ser un número mayor o igual a cero.");
         }
 
-        try {
-            int stockFinal = stock.fijarStock(id, nuevo);
+        int stockFinal = stock.fijarStock(id, nuevo);
 
-            return productos.findById(id)
-                    .map(producto -> {
-                        producto.setStock(stockFinal);
-                        return ResponseEntity.ok(ProductoResponse.desde(producto));
-                    })
-                    .orElse(ResponseEntity.notFound().build());
-        } catch (StockService.ProductoNoEncontrado e) {
-            return ResponseEntity.notFound().build();
-        } catch (StockService.MovimientoInvalido e) {
-            return ResponseEntity.badRequest().body(Map.of("motivo", e.getMessage()));
-        }
+        Producto producto = productos.findById(id)
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El producto " + id + " no existe."));
+
+        producto.setStock(stockFinal);
+        return ProductoResponse.desde(producto);
     }
 
     // Baja logica: el producto deja de mostrarse pero la boleta vieja lo sigue nombrando.
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {
-        return productos.findById(id).map(producto -> {
-            producto.setActivo(false);
-            productos.save(producto);
-            return ResponseEntity.noContent().<Void>build();
-        }).orElse(ResponseEntity.notFound().build());
+        Producto producto = productos.findById(id)
+                .orElseThrow(() -> ErrorDeNegocio.noEncontrado("El producto " + id + " no existe."));
+
+        producto.setActivo(false);
+        productos.save(producto);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    private Categoria categoriaDe(Long categoriaId) {
+        return categorias.findById(categoriaId)
+                .orElseThrow(() -> ErrorDeNegocio.invalido("La categoría " + categoriaId + " no existe."));
     }
 
     private void aplicar(Producto producto, ProductoRequest datos, Categoria categoria) {

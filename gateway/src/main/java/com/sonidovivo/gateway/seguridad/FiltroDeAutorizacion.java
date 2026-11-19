@@ -72,8 +72,9 @@ public class FiltroDeAutorizacion implements GlobalFilter, Ordered {
 
     private boolean esPublica(String metodo, String ruta) {
         if ("GET".equals(metodo)) {
-            // El historial completo de movimientos es del panel, no del sitio publico.
-            if (ruta.startsWith("/api/movimientos")) {
+            // El kardex (historial de stock) es del panel, no del sitio publico, aunque cuelgue
+            // de la ruta de un producto.
+            if (ruta.startsWith("/api/movimientos") || ruta.contains("/movimientos")) {
                 return false;
             }
 
@@ -99,7 +100,12 @@ public class FiltroDeAutorizacion implements GlobalFilter, Ordered {
 
         // Catalogo: leer es publico, escribir y ver el historial es del panel.
         if (ruta.startsWith("/api/productos") || ruta.startsWith("/api/categorias") || ruta.startsWith("/api/movimientos")) {
-            return !"GET".equals(metodo) || ruta.startsWith("/api/movimientos");
+            if (!"GET".equals(metodo)) {
+                return true;
+            }
+
+            // El kardex (historial de stock) es informacion del panel, aunque cuelgue de un producto.
+            return ruta.startsWith("/api/movimientos") || ruta.contains("/movimientos");
         }
 
         // Mensajeria: el POST es publico, la bandeja es del panel.
@@ -116,9 +122,14 @@ public class FiltroDeAutorizacion implements GlobalFilter, Ordered {
             return "PATCH".equals(metodo) || "DELETE".equals(metodo);
         }
 
-        // Despachos: el cliente registra la entrega de su pedido; listar y corregir es del panel.
+        // Despachos: el cliente registra la entrega y ve la de su pedido para el comprobante;
+        // el listado completo y la correccion de datos son del panel.
         if (ruta.startsWith("/api/despachos")) {
-            return "GET".equals(metodo) || "PUT".equals(metodo) || "DELETE".equals(metodo);
+            if ("GET".equals(metodo)) {
+                return ruta.equals("/api/despachos") || ruta.equals("/api/despachos/");
+            }
+
+            return "PUT".equals(metodo) || "DELETE".equals(metodo);
         }
 
         return false;

@@ -1,11 +1,11 @@
 package com.sonidovivo.usuarios.servicio;
 
 import com.sonidovivo.usuarios.dto.UsuarioRequest;
+import com.sonidovivo.usuarios.excepcion.ErrorDeNegocio;
 import com.sonidovivo.usuarios.model.Rol;
 import com.sonidovivo.usuarios.model.Usuario;
 import com.sonidovivo.usuarios.repository.RolRepository;
 import com.sonidovivo.usuarios.repository.UsuarioRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +36,7 @@ public class UsuarioService {
     }
 
     public Usuario buscar(Long id) {
-        return usuarios.findById(id).orElseThrow(() -> new ErrorDeNegocio(HttpStatus.NOT_FOUND, "Usuario no encontrado."));
+        return usuarios.findById(id).orElseThrow(() -> ErrorDeNegocio.noEncontrado("Usuario no encontrado."));
     }
 
     @Transactional
@@ -45,20 +45,20 @@ public class UsuarioService {
         String email = datos.email().trim().toLowerCase();
 
         if (!RutValidador.esValido(rut)) {
-            throw new ErrorDeNegocio(HttpStatus.BAD_REQUEST, "El RUT ingresado no es válido.");
+            throw ErrorDeNegocio.invalido("El RUT ingresado no es válido.");
         }
 
         if (usuarios.existsByEmailIgnoreCase(email)) {
-            throw new ErrorDeNegocio(HttpStatus.BAD_REQUEST, "Ya existe una cuenta con ese correo.");
+            throw ErrorDeNegocio.invalido("Ya existe una cuenta con ese correo.");
         }
 
         if (usuarios.existsByRut(rut)) {
-            throw new ErrorDeNegocio(HttpStatus.BAD_REQUEST, "Ya existe una cuenta con ese RUT.");
+            throw ErrorDeNegocio.invalido("Ya existe una cuenta con ese RUT.");
         }
 
         String nombreRol = (rolPedido == null || rolPedido.isBlank()) ? Rol.CLIENTE : rolPedido.trim();
         Rol rol = roles.findByNombreIgnoreCase(nombreRol)
-                .orElseThrow(() -> new ErrorDeNegocio(HttpStatus.BAD_REQUEST, "El rol no es válido."));
+                .orElseThrow(() -> ErrorDeNegocio.invalido("El rol no es válido."));
 
         Usuario usuario = new Usuario();
         usuario.setNombre(datos.nombre().trim());
@@ -76,14 +76,14 @@ public class UsuarioService {
     /** Login: compara la contrasena con el hash y no devuelve nada si no coincide. */
     public Usuario autenticar(String email, String password) {
         Usuario usuario = usuarios.findByEmailIgnoreCase(email.trim().toLowerCase())
-                .orElseThrow(() -> new ErrorDeNegocio(HttpStatus.UNAUTHORIZED, "Correo o contraseña incorrectos."));
+                .orElseThrow(() -> ErrorDeNegocio.noAutorizado("Correo o contraseña incorrectos."));
 
         if (!encriptador.matches(password, usuario.getPasswordHash())) {
-            throw new ErrorDeNegocio(HttpStatus.UNAUTHORIZED, "Correo o contraseña incorrectos.");
+            throw ErrorDeNegocio.noAutorizado("Correo o contraseña incorrectos.");
         }
 
         if (!Boolean.TRUE.equals(usuario.getActivo())) {
-            throw new ErrorDeNegocio(HttpStatus.FORBIDDEN, "La cuenta está desactivada.");
+            throw ErrorDeNegocio.prohibido("La cuenta está desactivada.");
         }
 
         return usuario;
@@ -94,14 +94,14 @@ public class UsuarioService {
         Usuario usuario = buscar(id);
 
         Rol rol = roles.findByNombreIgnoreCase(rolPedido == null ? "" : rolPedido.trim())
-                .orElseThrow(() -> new ErrorDeNegocio(HttpStatus.BAD_REQUEST, "El rol no es válido."));
+                .orElseThrow(() -> ErrorDeNegocio.invalido("El rol no es válido."));
 
         boolean dejaDeSerAdmin = Rol.ADMINISTRADOR.equalsIgnoreCase(usuario.getRol().getNombre())
                 && !Rol.ADMINISTRADOR.equalsIgnoreCase(rol.getNombre());
 
         // La tienda no puede quedar sin administrador activo.
         if (dejaDeSerAdmin && Boolean.TRUE.equals(usuario.getActivo()) && administradoresActivos() <= 1) {
-            throw new ErrorDeNegocio(HttpStatus.BAD_REQUEST, "No puedes quitar el rol al último administrador activo.");
+            throw ErrorDeNegocio.invalido("No puedes quitar el rol al último administrador activo.");
         }
 
         usuario.setRol(rol);
@@ -116,7 +116,7 @@ public class UsuarioService {
 
         if (seDesactiva && Rol.ADMINISTRADOR.equalsIgnoreCase(usuario.getRol().getNombre())
                 && administradoresActivos() <= 1) {
-            throw new ErrorDeNegocio(HttpStatus.BAD_REQUEST, "No puedes desactivar al último administrador activo.");
+            throw ErrorDeNegocio.invalido("No puedes desactivar al último administrador activo.");
         }
 
         usuario.setActivo(activo);
@@ -129,19 +129,5 @@ public class UsuarioService {
 
     private boolean vacio(String valor) {
         return valor == null || valor.isBlank();
-    }
-
-    // Error de negocio con su codigo HTTP: el controlador solo lo traduce a respuesta.
-    public static class ErrorDeNegocio extends RuntimeException {
-        private final HttpStatus estado;
-
-        public ErrorDeNegocio(HttpStatus estado, String mensaje) {
-            super(mensaje);
-            this.estado = estado;
-        }
-
-        public HttpStatus getEstado() {
-            return estado;
-        }
     }
 }
