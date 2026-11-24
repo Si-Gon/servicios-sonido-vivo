@@ -94,9 +94,10 @@ responde `400` con el motivo.
 
 | Método | Ruta | Uso |
 |---|---|---|
-| `POST` | `/api/pedidos` | Emitir la boleta; el total lo calcula el servicio y acepta `claveIdempotencia` |
+| `POST` | `/api/pedidos` | Emitir la boleta; el servicio toma nombre y precio del catálogo, calcula los totales, descuenta el stock y acepta `claveIdempotencia` |
 | `GET` | `/api/pedidos` | Listar; filtros `?usuarioId=`, `?estado=` |
-| `GET` | `/api/pedidos/{id}` | Ver la boleta con sus líneas |
+| `GET` | `/api/pedidos/{id}` | Ver la boleta con sus líneas; solo su dueño o un administrador |
+| `GET` | `/api/pedidos/mios` | Compras del cliente con sesión; el usuario sale del token, no de un parámetro |
 | `PATCH` | `/api/pedidos/{id}/estado` | Cambiar estado; cancelar devuelve el stock al catálogo |
 
 ### despachos (8094)
@@ -240,6 +241,7 @@ Cada servicio las lleva en `src/main/resources/db/migracion`, con el nombre
 - Nombres de base sin sufijo `_db`, con `utf8mb4` y `utf8mb4_0900_ai_ci` en las cinco.
 - Paquete `com.sonidovivo.<servicio>`.
 - Contraseñas cifradas con BCrypt; nunca se devuelven en las respuestas.
-- Servicios autocontenidos: la única llamada entre servicios es la devolución de stock de `boletas`
+- Servicios autocontenidos: las únicas llamadas entre servicios son las de `boletas` a `catalogo` (leer
+  precio y nombre al emitir, descontar el stock y devolverlo al cancelar)
   a `catalogo`, hecha con `RestClient` y la dirección resuelta por Eureka (`DiscoveryClient`). No se
   usa Feign ni se comparten DTOs entre servicios.
