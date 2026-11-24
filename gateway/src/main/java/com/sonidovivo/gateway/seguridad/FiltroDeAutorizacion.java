@@ -100,11 +100,6 @@ public class FiltroDeAutorizacion implements GlobalFilter, Ordered {
 
         // Catalogo: leer es publico, escribir y ver el historial es del panel.
         if (ruta.startsWith("/api/productos") || ruta.startsWith("/api/categorias") || ruta.startsWith("/api/movimientos")) {
-            // Excepcion: al comprar, el cliente registra la SALIDA de stock de su venta. Basta con
-            // tener sesion; el catalogo revisa que un cliente solo pueda registrar ventas.
-            if ("POST".equals(metodo) && ruta.matches("/api/productos/\\d+/movimientos/?")) {
-                return false;
-            }
 
             if (!"GET".equals(metodo)) {
                 return true;

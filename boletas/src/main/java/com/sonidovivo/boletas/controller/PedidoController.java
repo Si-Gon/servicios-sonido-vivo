@@ -67,13 +67,17 @@ public class PedidoController {
         BigDecimal total = BigDecimal.ZERO;
 
         for (var linea : datos.items()) {
+            // El nombre y el precio salen del catalogo, no del navegador: la boleta no puede
+            // depender de lo que diga quien compra.
+            var delCatalogo = catalogo.datosDelProducto(linea.productoId());
+
             PedidoItem item = new PedidoItem();
             item.setProductoId(linea.productoId());
-            item.setNombreProducto(linea.nombreProducto().trim());
-            item.setPrecioUnitario(linea.precioUnitario());
+            item.setNombreProducto(delCatalogo.nombre());
+            item.setPrecioUnitario(delCatalogo.precioVigente());
             item.setCantidad(linea.cantidad());
 
-            BigDecimal subtotal = linea.precioUnitario().multiply(BigDecimal.valueOf(linea.cantidad()));
+            BigDecimal subtotal = delCatalogo.precioVigente().multiply(BigDecimal.valueOf(linea.cantidad()));
             item.setSubtotal(subtotal);
             total = total.add(subtotal);
 
@@ -82,9 +86,10 @@ public class PedidoController {
 
         pedido.setTotal(total);
 
+        Pedido guardado;
+
         try {
-            Pedido guardado = pedidos.save(pedido);
-            return ResponseEntity.status(HttpStatus.CREATED).body(PedidoResponse.desde(guardado));
+            guardado = pedidos.save(pedido);
         } catch (DataIntegrityViolationException e) {
             // Dos peticiones a la vez con la misma clave: gana la primera, esta devuelve esa boleta.
             if (clave == null) {
@@ -96,6 +101,41 @@ public class PedidoController {
                     .map(ResponseEntity::ok)
                     .orElseThrow(() -> e);
         }
+
+        // La venta y su efecto sobre el stock son una sola operacion, y la ejecuta el servicio:
+        // el navegador no descuenta nada. Si una linea no alcanza, se anula la boleta completa.
+        try {
+            for (PedidoItem item : guardado.getItems()) {
+                catalogo.descontarStock(item.getProductoId(), item.getCantidad(), guardado.getId());
+            }
+        } catch (RuntimeException e) {
+            anular(guardado);
+
+            if (e instanceof CatalogoClient.StockInsuficiente sinStock) {
+                throw ErrorDeNegocio.sinStock(sinStock.getMessage());
+            }
+
+            throw ErrorDeNegocio.noDisponible("No se pudo descontar el stock de la boleta "
+                    + guardado.getId() + ": " + e.getMessage());
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(PedidoResponse.desde(guardado));
+    }
+
+    // Compensacion: la venta no se concreto, asi que se devuelve lo que alcanzo a descontarse y se
+    // borra la boleta. No se deja una boleta cancelada: al cliente no se le vendio nada, y manana
+    // no tiene por que aparecer en sus compras.
+    private void anular(Pedido pedido) {
+        for (PedidoItem item : pedido.getItems()) {
+            try {
+                catalogo.devolverStock(item.getProductoId(), item.getCantidad(), pedido.getId());
+            } catch (RuntimeException ignorado) {
+                // Si ni la devolucion responde, la boleta se borra igual: el kardex queda con la
+                // salida y su referencia, y se puede corregir desde el panel.
+            }
+        }
+
+        pedidos.delete(pedido);
     }
 
     // Listado para el panel; admite filtrar por usuario o por estado.
@@ -132,10 +172,24 @@ public class PedidoController {
     }
 
     @GetMapping("/{id}")
-    public PedidoResponse buscar(@PathVariable Long id) {
-        return pedidos.findById(id)
-                .map(PedidoResponse::desde)
+    public PedidoResponse buscar(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long usuarioId,
+            @RequestHeader(value = "X-Usuario-Rol", required = false) String rol) {
+
+        Pedido pedido = pedidos.findById(id)
                 .orElseThrow(() -> ErrorDeNegocio.noEncontrado("La boleta " + id + " no existe."));
+
+        // El gateway entrega el id y el rol que vienen dentro del token. Sin cabeceras es una
+        // llamada interna entre servicios, que no pasa por el borde.
+        boolean esAdmin = "Administrador".equalsIgnoreCase(rol);
+        boolean esDueno = usuarioId != null && usuarioId.equals(pedido.getUsuarioId());
+
+        if (rol != null && !esAdmin && !esDueno) {
+            throw ErrorDeNegocio.prohibido("La boleta " + id + " no es tuya.");
+        }
+
+        return PedidoResponse.desde(pedido);
     }
 
     // Cambia el estado (en preparacion, despachado, entregado, cancelado).
